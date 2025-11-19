@@ -35,15 +35,20 @@ exports.registerVolunteer = async (req, res) => {
             zip_code
         });
         await newVolunteer.save();
-        // Send a welcome email
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-        const logoUrl = process.env.LOGO_URL || `${frontendUrl}/logo.png`;
         
-        await sendMail({
-            to: contact_email, // Recipient email
-            subject: 'Welcome to Foster Toys!',
-            text: `Hello ${contact_person_name},\n\nThank you for registering as a volunteer with Foster Toys. We're excited to have you on board and appreciate your willingness to help make a difference in children's lives!\n\nThank you,\nThe Foster Toys Team`,
-            html: `
+        // Send a welcome email (non-blocking - don't fail registration if email fails)
+        let emailSent = false;
+        let emailError = null;
+        
+        try {
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            const logoUrl = process.env.LOGO_URL || `${frontendUrl}/logo.png`;
+            
+            await sendMail({
+                to: contact_email, // Recipient email
+                subject: 'Welcome to Foster Toys!',
+                text: `Hello ${contact_person_name},\n\nThank you for registering as a volunteer with Foster Toys. We're excited to have you on board and appreciate your willingness to help make a difference in children's lives!\n\nThank you,\nThe Foster Toys Team`,
+                html: `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -114,9 +119,26 @@ exports.registerVolunteer = async (req, res) => {
 </body>
 </html>
             `
-        });
+            });
+            emailSent = true;
+        } catch (error) {
+            emailError = error.message;
+            console.error("Error sending welcome email to volunteer:", {
+                email: contact_email,
+                error: error.message,
+                code: error.code,
+            });
+        }
 
-        res.status(201).json({ message: "Volunteer registered successfully! A confirmation email has been sent." });
+        const responseMessage = emailSent 
+            ? "Volunteer registered successfully! A confirmation email has been sent."
+            : "Volunteer registered successfully! (Note: Confirmation email could not be sent, but your registration is complete.)";
+
+        res.status(201).json({ 
+            message: responseMessage,
+            emailSent,
+            ...(emailError && { emailError: "Email service temporarily unavailable" })
+        });
 
     } catch (error) {
         console.error("Error sending email:", error);
