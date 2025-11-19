@@ -11,9 +11,50 @@ exports.registerVolunteer = async (req, res) => {
             choose_password, repeat_password, zip_code 
         } = req.body;
 
+        // Validate required fields
+        if (!contact_person_name || !contact_person_name.trim()) {
+            return res.status(400).json({ message: "Contact person name is required" });
+        }
+
+        if (!contact_email || !contact_email.trim()) {
+            return res.status(400).json({ message: "Contact email is required" });
+        }
+
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(contact_email)) {
+            return res.status(400).json({ message: "Invalid email format" });
+        }
+
+        if (!contact_phone) {
+            return res.status(400).json({ message: "Contact phone is required" });
+        }
+
+        // Validate phone number format (should have at least 10 digits)
+        const phoneDigits = String(contact_phone).replace(/\D/g, '');
+        if (phoneDigits.length < 10) {
+            return res.status(400).json({ message: "Contact phone must contain at least 10 digits" });
+        }
+
+        if (!choose_password) {
+            return res.status(400).json({ message: "Password is required" });
+        }
+
+        if (choose_password.length < 6) {
+            return res.status(400).json({ message: "Password must be at least 6 characters long" });
+        }
+
+        if (!repeat_password) {
+            return res.status(400).json({ message: "Password confirmation is required" });
+        }
+
         // Check if passwords match
         if (choose_password !== repeat_password) {
             return res.status(400).json({ message: "Passwords do not match" });
+        }
+
+        if (!zip_code || !zip_code.trim()) {
+            return res.status(400).json({ message: "Zip code is required" });
         }
 
         // Check if the email already exists
@@ -25,15 +66,23 @@ exports.registerVolunteer = async (req, res) => {
         // Hash the password
         const hashedPassword = await bcrypt.hash(choose_password, 10);
 
+        // Convert contact_phone to number (extract digits only)
+        const phoneNumber = parseInt(phoneDigits, 10);
+        
+        if (isNaN(phoneNumber)) {
+            return res.status(400).json({ message: "Invalid phone number format" });
+        }
+
         // Create a new Volunteer
         const newVolunteer = new Volunteer({
-            contact_person_name,
-            contact_email,
-            contact_phone,
+            contact_person_name: contact_person_name.trim(),
+            contact_email: contact_email.trim().toLowerCase(),
+            contact_phone: phoneNumber,
             choose_password: hashedPassword, // Store hashed password
             repeat_password: hashedPassword, // Store hashed for confirmation
-            zip_code
+            zip_code: zip_code.trim()
         });
+        
         await newVolunteer.save();
         
         // Send a welcome email (non-blocking - don't fail registration if email fails)
@@ -141,8 +190,28 @@ exports.registerVolunteer = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Error sending email:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
+        console.error("Error registering volunteer:", error);
+        
+        // Handle Mongoose validation errors
+        if (error.name === 'ValidationError') {
+            const errors = Object.values(error.errors).map(err => err.message);
+            return res.status(400).json({ 
+                message: "Validation error", 
+                errors: errors 
+            });
+        }
+
+        // Handle duplicate key errors
+        if (error.code === 11000) {
+            return res.status(400).json({ 
+                message: "Email already exists" 
+            });
+        }
+
+        res.status(500).json({ 
+            message: "Server error", 
+            error: error.message 
+        });
     }
 };
 
