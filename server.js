@@ -8,32 +8,36 @@ const connectDB = require('./src/config/db');
 const app = express();
 
 // ✅ CORS Configuration (Must be before routes)
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://fostertoys.org',
+  'https://www.fostertoys.org',
+  process.env.FRONTEND_URL // Allow environment variable for frontend URL
+].filter(Boolean); // Remove undefined values
+
 const corsOptions = {
-  origin: 'http://localhost:3000', // Allow frontend
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      // In development, allow any origin; in production, restrict to allowed origins
+      if (process.env.NODE_ENV === 'production') {
+        callback(new Error('Not allowed by CORS'));
+      } else {
+        callback(null, true);
+      }
+    }
+  },
   credentials: true, // Allow cookies & authentication headers
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], // Allow all necessary HTTP methods
   allowedHeaders: ['Content-Type', 'Authorization'], // Allow these headers
   exposedHeaders: ['Authorization'], // Allow frontend to access `Authorization` header
 };
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Credentials', 'true');
-  next();
-});
+
 app.use(cors(corsOptions));
-
-// ✅ Handle CORS Preflight Requests (Important)
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:3000'); // Allow frontend
-  res.header('Access-Control-Allow-Credentials', 'true'); // Allow cookies & authentication
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS'); // Allow these methods
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization'); // Allow these headers
-
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200); // ✅ Handle preflight requests properly
-  }
-  
-  next();
-});
 
 // ✅ Security & Logging Middleware
 app.use(helmet());
