@@ -6,84 +6,142 @@ const { sendMail } = require('../../utils/mailer'); // Nodemailer wrapper for em
 // Register a new Volunteer
 exports.registerVolunteer = async (req, res) => {
     try {
+        // Log the incoming request for debugging
+        console.log('Register Volunteer Request Body:', JSON.stringify(req.body, null, 2));
+        console.log('Request Headers Content-Type:', req.headers['content-type']);
+        console.log('Request Body Type:', typeof req.body);
+        console.log('Request Body Keys:', req.body ? Object.keys(req.body) : 'req.body is null/undefined');
+        
+        // Check if request body exists
+        if (!req.body || typeof req.body !== 'object') {
+            console.log('Error: Request body is missing or invalid');
+            return res.status(400).json({ message: "Request body is required" });
+        }
+        
         const { 
             contact_person_name, contact_email, contact_phone, 
             choose_password, repeat_password, zip_code 
         } = req.body;
 
         // Validate required fields
+        console.log('Step 1: Validating contact_person_name...');
         if (!contact_person_name || !contact_person_name.trim()) {
+            console.log('Validation failed: contact_person_name is missing or empty');
             return res.status(400).json({ message: "Contact person name is required" });
         }
+        console.log('✓ contact_person_name validated');
 
+        console.log('Step 2: Validating contact_email...');
         if (!contact_email || !contact_email.trim()) {
+            console.log('Validation failed: contact_email is missing or empty');
             return res.status(400).json({ message: "Contact email is required" });
         }
 
         // Basic email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(contact_email)) {
+            console.log('Validation failed: Invalid email format');
             return res.status(400).json({ message: "Invalid email format" });
         }
+        // Normalize email to lowercase for consistent storage and lookup
+        const normalizedEmail = contact_email.trim().toLowerCase();
+        console.log('✓ contact_email validated and normalized');
 
-        if (!contact_phone) {
+        console.log('Step 3: Validating contact_phone...');
+        if (!contact_phone || (typeof contact_phone === 'string' && !contact_phone.trim())) {
+            console.log('Validation failed: contact_phone is missing or empty');
             return res.status(400).json({ message: "Contact phone is required" });
         }
 
         // Validate phone number format (should have at least 10 digits)
         const phoneDigits = String(contact_phone).replace(/\D/g, '');
-        if (phoneDigits.length < 10) {
+        console.log('Phone number processing:', { original: contact_phone, digits: phoneDigits, length: phoneDigits.length });
+        if (!phoneDigits || phoneDigits.length < 10) {
+            console.log('Validation failed: phone number has less than 10 digits');
             return res.status(400).json({ message: "Contact phone must contain at least 10 digits" });
         }
+        console.log('✓ contact_phone validated');
 
+        console.log('Step 4: Validating passwords...');
         if (!choose_password) {
+            console.log('Validation failed: choose_password is missing');
             return res.status(400).json({ message: "Password is required" });
         }
 
         if (choose_password.length < 6) {
+            console.log('Validation failed: Password too short');
             return res.status(400).json({ message: "Password must be at least 6 characters long" });
         }
 
         if (!repeat_password) {
+            console.log('Validation failed: repeat_password is missing');
             return res.status(400).json({ message: "Password confirmation is required" });
         }
 
         // Check if passwords match
         if (choose_password !== repeat_password) {
+            console.log('Validation failed: Passwords do not match');
             return res.status(400).json({ message: "Passwords do not match" });
         }
+        console.log('✓ Passwords validated');
 
+        console.log('Step 5: Validating zip_code...');
         if (!zip_code || !zip_code.trim()) {
+            console.log('Validation failed: zip_code is missing or empty');
             return res.status(400).json({ message: "Zip code is required" });
         }
+        console.log('✓ zip_code validated');
 
-        // Check if the email already exists
-        const existingVolunteer = await Volunteer.findOne({ contact_email });
+        // Check if the email already exists (using normalized email)
+        console.log('Step 6: Checking if email already exists...');
+        console.log('Checking for email:', normalizedEmail);
+        const existingVolunteer = await Volunteer.findOne({ contact_email: normalizedEmail });
         if (existingVolunteer) {
+            console.log('Validation failed: Email already exists in database');
             return res.status(400).json({ message: "Email already exists" });
         }
+        console.log('✓ Email is unique');
 
         // Hash the password
+        console.log('Step 7: Hashing password...');
         const hashedPassword = await bcrypt.hash(choose_password, 10);
+        console.log('✓ Password hashed');
 
         // Convert contact_phone to number (extract digits only)
-        const phoneNumber = parseInt(phoneDigits, 10);
+        console.log('Step 8: Parsing phone number...');
+        // Use BigInt or keep as string if the number is too large for safe integer
+        let phoneNumber;
+        if (phoneDigits.length > 15) {
+            console.log('Validation failed: phone number too long');
+            return res.status(400).json({ message: "Phone number is too long" });
+        }
         
-        if (isNaN(phoneNumber)) {
+        // For phone numbers, we can safely parse as integer
+        phoneNumber = parseInt(phoneDigits, 10);
+        console.log('Parsed phone number:', phoneNumber, 'Type:', typeof phoneNumber);
+        
+        if (isNaN(phoneNumber) || phoneNumber <= 0) {
+            console.log('Validation failed: phone number is NaN or invalid', { phoneNumber, phoneDigits });
             return res.status(400).json({ message: "Invalid phone number format" });
         }
+        
+        console.log('✓ Phone number parsed successfully:', phoneNumber);
 
         // Create a new Volunteer
+        console.log('Step 9: Creating volunteer object...');
         const newVolunteer = new Volunteer({
             contact_person_name: contact_person_name.trim(),
-            contact_email: contact_email.trim().toLowerCase(),
+            contact_email: normalizedEmail, // Use normalized email
             contact_phone: phoneNumber,
             choose_password: hashedPassword, // Store hashed password
             repeat_password: hashedPassword, // Store hashed for confirmation
             zip_code: zip_code.trim()
         });
+        console.log('✓ Volunteer object created');
         
+        console.log('Step 10: Saving volunteer to database...');
         await newVolunteer.save();
+        console.log('✓ Volunteer saved successfully');
         
         // Send a welcome email (non-blocking - don't fail registration if email fails)
         let emailSent = false;
@@ -191,10 +249,14 @@ exports.registerVolunteer = async (req, res) => {
 
     } catch (error) {
         console.error("Error registering volunteer:", error);
+        console.error("Error stack:", error.stack);
+        console.error("Error name:", error.name);
+        console.error("Error code:", error.code);
         
         // Handle Mongoose validation errors
         if (error.name === 'ValidationError') {
             const errors = Object.values(error.errors).map(err => err.message);
+            console.log('Mongoose validation errors:', errors);
             return res.status(400).json({ 
                 message: "Validation error", 
                 errors: errors 
@@ -203,6 +265,7 @@ exports.registerVolunteer = async (req, res) => {
 
         // Handle duplicate key errors
         if (error.code === 11000) {
+            console.log('Duplicate key error - email already exists');
             return res.status(400).json({ 
                 message: "Email already exists" 
             });
