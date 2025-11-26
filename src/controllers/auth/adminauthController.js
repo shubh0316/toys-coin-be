@@ -5,9 +5,9 @@ require('dotenv').config();
 
 // Hardcoded Admin Credentials
 const hardcodedAdmins = [
-    { email: 'shubhankersaxena5@gmail.com', password: 'Shubh@2000' },
-    { email: 'admin2@example.com', password: 'securepass456' },
-    { email: 'admin3@example.com', password: 'mypassword789' }
+    { email: 'cory.kelly@fostertoys.org', password: 'FosterToys2025911' },
+    { email: 'aiden.kelly@fostertoys.org', password: 'FosterToys2025911' },
+    { email: 'support@fostertoys.org', password: 'FosterToys2025911' }
 ];
 
 // Function to seed hardcoded admins into the database
