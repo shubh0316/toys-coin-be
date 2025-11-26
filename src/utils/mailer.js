@@ -24,33 +24,34 @@ async function createTransporter() {
 
         // Common connection options for all transports
         const connectionOptions = {
-            connectionTimeout: 120000, // 60 seconds to establish connection
+            connectionTimeout: 60000, // 60 seconds to establish connection
             greetingTimeout: 30000, // 30 seconds to receive greeting
             socketTimeout: 60000, // 60 seconds for socket inactivity
-            // Keep connection alive for better reliability
-            pool: true,
-            maxConnections: 5,
-            maxMessages: 100,
             // Enable debug logging in development
             debug: process.env.NODE_ENV === 'development',
             logger: process.env.NODE_ENV === 'development',
         };
 
+        let transporter;
+
         if (GMAIL_USER && GMAIL_APP_PASSWORD) {
-            return nodemailer.createTransport({
-                host: "smtp.gmail.com",
-                port: 465,
-                secure: true,
+            console.log('[mailer] Using Gmail SMTP configuration');
+            transporter = nodemailer.createTransport({
+                service: 'gmail',
                 auth: {
                     user: GMAIL_USER,
                     pass: GMAIL_APP_PASSWORD,
                 },
                 ...connectionOptions,
             });
-        }
-
-        if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
-            return nodemailer.createTransport({
+        } else if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+            console.log('[mailer] Using custom SMTP configuration:', {
+                host: SMTP_HOST,
+                port: SMTP_PORT || 587,
+                secure: SMTP_SECURE,
+                user: SMTP_USER,
+            });
+            transporter = nodemailer.createTransport({
                 host: SMTP_HOST,
                 port: Number(SMTP_PORT) || 587,
                 secure: String(SMTP_SECURE).toLowerCase() === "true",
@@ -60,33 +61,57 @@ async function createTransporter() {
                 },
                 ...connectionOptions,
             });
+        } else {
+            console.warn('[mailer] ⚠️  SMTP credentials missing! Emails will not be sent in production.');
+            console.warn('[mailer] Please set either GMAIL_USER + GMAIL_APP_PASSWORD or SMTP_HOST + SMTP_USER + SMTP_PASS');
+            
+            const testAccount = await nodemailer.createTestAccount();
+            console.warn(
+                "[mailer] Using temporary Ethereal account for testing:",
+                {
+                    user: testAccount.user,
+                    pass: testAccount.pass,
+                }
+            );
+
+            transporter = nodemailer.createTransport({
+                host: "smtp.ethereal.email",
+                port: 587,
+                secure: false,
+                auth: {
+                    user: testAccount.user,
+                    pass: testAccount.pass,
+                },
+                ...connectionOptions,
+            });
         }
 
-        const testAccount = await nodemailer.createTestAccount();
-        console.warn(
-            "[mailer] SMTP credentials missing. Using temporary Ethereal account for testing:",
-            {
-                user: testAccount.user,
-                pass: testAccount.pass,
-            }
-        );
+        // Verify connection
+        try {
+            await transporter.verify();
+            console.log('[mailer] ✅ SMTP connection verified successfully');
+        } catch (verifyError) {
+            console.error('[mailer] ❌ SMTP connection verification failed:', verifyError.message);
+            // Don't throw here - let it fail on actual send so we can retry
+        }
 
-        return nodemailer.createTransport({
-            host: "smtp.ethereal.email",
-            port: 587,
-            secure: false,
-            auth: {
-                user: testAccount.user,
-                pass: testAccount.pass,
-            },
-            ...connectionOptions,
-        });
+        return transporter;
     })();
 
     return transporterPromise;
 }
 
 async function sendMail(options, retries = 2) {
+    // Check if SMTP credentials are configured
+    const hasGmail = process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD;
+    const hasSMTP = process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS;
+    
+    if (!hasGmail && !hasSMTP) {
+        const error = new Error('SMTP credentials not configured. Please set GMAIL_USER + GMAIL_APP_PASSWORD or SMTP_HOST + SMTP_USER + SMTP_PASS environment variables.');
+        console.error('[mailer] ❌', error.message);
+        throw error;
+    }
+
     let transporter = await createTransporter();
     
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -97,9 +122,11 @@ async function sendMail(options, retries = 2) {
                 await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
             }
 
+            console.log(`[mailer] Sending email to ${options.to} (attempt ${attempt + 1}/${retries + 1})`);
+
             const info = await Promise.race([
                 transporter.sendMail({
-                    from: process.env.SMTP_FROM_EMAIL || '"Toys Coin" <support@toyscoin.org>',
+                    from: process.env.SMTP_FROM_EMAIL || '"Foster Toys" <support@fostertoys.org>',
                     ...options,
                 }),
                 new Promise((_, reject) => 
@@ -107,6 +134,7 @@ async function sendMail(options, retries = 2) {
                 )
             ]);
 
+            console.log(`[mailer] ✅ Email sent successfully to ${options.to}`);
             const previewUrl = nodemailer.getTestMessageUrl(info);
             return {
                 ...info,
@@ -117,7 +145,7 @@ async function sendMail(options, retries = 2) {
             const isTimeoutError = error.code === 'ETIMEDOUT' || error.message.includes('timeout');
             const isConnectionError = error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.command === 'CONN';
             
-            console.error(`[mailer] Error sending email (attempt ${attempt + 1}/${retries + 1}):`, {
+            console.error(`[mailer] ❌ Error sending email (attempt ${attempt + 1}/${retries + 1}):`, {
                 error: error.message,
                 code: error.code,
                 command: error.command,
@@ -134,6 +162,14 @@ async function sendMail(options, retries = 2) {
 
             // If it's the last attempt or not a timeout/connection error, throw immediately
             if (isLastAttempt || (!isTimeoutError && !isConnectionError)) {
+                // Provide helpful error message
+                if (error.code === 'EAUTH') {
+                    throw new Error('SMTP authentication failed. Please check your email credentials.');
+                } else if (error.code === 'ETIMEDOUT') {
+                    throw new Error('SMTP connection timeout. Please check your network connection and SMTP server settings.');
+                } else if (error.code === 'ECONNREFUSED') {
+                    throw new Error('SMTP connection refused. Please check your SMTP host and port settings.');
+                }
                 throw error;
             }
             
