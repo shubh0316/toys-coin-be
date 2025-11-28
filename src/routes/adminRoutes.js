@@ -4,7 +4,7 @@ const { adminLogin } = require('../controllers/auth/adminauthController'); // Fi
 const { getAllInvites } = require('../controllers/admin/getAllAgenciesInvitedController');
 
 const router = express.Router();
-router.post('/login', adminLogin)
+router.post('/login', adminLogin);
 router.post('/invite-admin', sendInvite);
 router.get('/invites', getAllInvites);
 

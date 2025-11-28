@@ -7,32 +7,9 @@ const connectDB = require('./src/config/db');
 
 const app = express();
 
-// ✅ CORS Configuration (Must be before routes)
-const allowedOrigins = [
-  'http://localhost:3000',
-  'https://fostertoys.org',
-  'https://www.fostertoys.org',
-  'http://api.fostertoys.org',
-  'https://api.fostertoys.org',
-  process.env.FRONTEND_URL // Allow environment variable for frontend URL
-].filter(Boolean); // Remove undefined values
-
+// ✅ CORS Configuration - Allow all origins
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      // In development, allow any origin; in production, restrict to allowed origins
-      if (process.env.NODE_ENV === 'production') {
-        callback(new Error('Not allowed by CORS'));
-      } else {
-        callback(null, true);
-      }
-    }
-  },
+  origin: true, // Allow all origins
   credentials: true, // Allow cookies & authentication headers
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], // Allow all necessary HTTP methods
   allowedHeaders: ['Content-Type', 'Authorization'], // Allow these headers
@@ -42,7 +19,10 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // ✅ Security & Logging Middleware
-app.use(helmet());
+app.use(helmet({
+  referrerPolicy: { policy: "no-referrer-when-downgrade" },
+  crossOriginEmbedderPolicy: false, // Allow cross-origin requests
+}));
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -73,6 +53,14 @@ app.get('/', (req, res) => {
 
 // ✅ Global Error Handler
 app.use((err, req, res, next) => {
+  // Handle CORS errors
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ 
+      message: 'CORS Error: Origin not allowed',
+      error: err.message 
+    });
+  }
+  
   console.error('❌ Error:', err.stack);
   res.status(500).json({ message: 'An unexpected error occurred.', error: err.message });
 });
