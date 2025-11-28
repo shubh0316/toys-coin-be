@@ -12,6 +12,8 @@ const allowedOrigins = [
   'http://localhost:3000',
   'https://fostertoys.org',
   'https://www.fostertoys.org',
+  'http://api.fostertoys.org',
+  'https://api.fostertoys.org',
   process.env.FRONTEND_URL // Allow environment variable for frontend URL
 ].filter(Boolean); // Remove undefined values
 

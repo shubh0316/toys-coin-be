@@ -48,7 +48,8 @@ exports.adminLogin = async (req, res) => {
         const token = jwt.sign({ email: admin.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
         res.cookie('x-auth-tk', token, {
             httpOnly: true, // ✅ Prevents JavaScript access (XSS protection)
-            sameSite: 'Lax', // ✅ Helps prevent CSRF attacks
+            sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax', // ✅ Cross-origin support in production
+            secure: process.env.NODE_ENV === 'production', // ✅ HTTPS only in production
             path: '/',
         });
         res.status(200).json({ message: 'Login successful', token });
