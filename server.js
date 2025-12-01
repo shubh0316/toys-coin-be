@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 require('dotenv').config();
 const connectDB = require('./src/config/db');
+const { seedAdmins } = require('./src/controllers/auth/adminauthController');
 
 const app = express();
 
@@ -37,9 +38,18 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ✅ Block all requests if MongoDB is not connected
+if (typeof connectDB.ensureDBConnectedMiddleware === 'function') {
+  app.use(connectDB.ensureDBConnectedMiddleware);
+}
+
 // ✅ Connect to MongoDB
 connectDB()
-  .then(() => console.log('✅ Connected to MongoDB'))
+  .then(async () => {
+    console.log('✅ Connected to MongoDB');
+    // ✅ Seed admin users only AFTER successful DB connection
+    await seedAdmins();
+  })
   .catch((err) => {
     console.error('❌ Failed to connect to MongoDB:', err.message);
     process.exit(1);

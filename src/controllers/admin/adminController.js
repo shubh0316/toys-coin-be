@@ -2,6 +2,9 @@ const Admin = require('../../models/Admin');
 const Agency = require('../../models/Agency');
 const { sendMail } = require('../../utils/mailer');
 
+// Simple helper to introduce an artificial delay before DB operations
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // Function to send invite and update status
 exports.sendInvite = async (req, res) => {
     const { invited_email } = req.body;
@@ -11,6 +14,8 @@ exports.sendInvite = async (req, res) => {
     }
 
     try {
+        // Artificial delay before querying the database
+        await delay(500);
         // Check if the invited email already exists in the Agency model
         const existingAgency = await Agency.findOne({ contact_email: invited_email });
 

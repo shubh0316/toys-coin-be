@@ -6,14 +6,23 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { sendMail } = require('../../utils/mailer');
 
+// Simple helper to introduce an artificial delay before DB operations
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // Function to find user in any model
 const findUserByEmail = async (email) => {
+    // Artificial delay before querying the database
+    await delay(500);
     let user = await AdminLogin.findOne({ email });   
     if (user) return { model: AdminLogin, user };
 
+    // Artificial delay before querying the database
+    await delay(500);
     user = await Agency.findOne({ contact_email: email });
     if (user) return { model: Agency, user };
 
+    // Artificial delay before querying the database
+    await delay(500);
     user = await Volunteer.findOne({ contact_email: email });
     if (user) return { model: Volunteer, user };
 

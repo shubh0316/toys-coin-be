@@ -2,15 +2,22 @@ const bcrypt = require('bcryptjs'); // For password hashing
 const jwt = require('jsonwebtoken'); // For generating JWT tokens
 const Agency = require('../../models/Agency'); // Import the model
 const Volunteer = require('../../models/Volunteer');
+
+// Simple helper to introduce an artificial delay before DB operations
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // Login an agency
 exports.loginAgency = async (req, res) => {
     try {
         const { contact_email, choose_password } = req.body;
 
+        // Artificial delay before querying the database
+        await delay(500);
         const existingVolunteer = await Volunteer.findOne({ contact_email });
         if(existingVolunteer) {
             return res.json(400).json({ message: "Email is already registered as an agency" })
         }
+        // Artificial delay before querying the database
+        await delay(500);
         // Find agency by email
         const agency = await Agency.findOne({ contact_email });
         if (!agency) {

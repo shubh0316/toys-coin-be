@@ -2,10 +2,15 @@ const Volunteer = require('../../models/Volunteer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+// Simple helper to introduce an artificial delay before DB operations
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 exports.loginVolunteer = async (req, res) => {
     try {
         const { contact_email, choose_password } = req.body;
 
+        // Artificial delay before querying the database
+        await delay(500);
         // Check if email is already registered as a volunteer
         const existingVolunteer = await Volunteer.findOne({ contact_email });
         if (!existingVolunteer) {

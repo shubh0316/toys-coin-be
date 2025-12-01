@@ -3,6 +3,9 @@ const bcrypt = require('bcryptjs'); // For hashing passwords
 const jwt = require('jsonwebtoken'); // For generating JWT tokens
 const { sendMail } = require('../../utils/mailer'); // Nodemailer wrapper for emails
 
+// Simple helper to introduce an artificial delay before DB operations
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // Register a new Volunteer
 exports.registerVolunteer = async (req, res) => {
     try {
@@ -95,6 +98,8 @@ exports.registerVolunteer = async (req, res) => {
         // Check if the email already exists (using normalized email)
         console.log('Step 6: Checking if email already exists...');
         console.log('Checking for email:', normalizedEmail);
+        // Artificial delay before querying the database
+        await delay(500);
         const existingVolunteer = await Volunteer.findOne({ contact_email: normalizedEmail });
         if (existingVolunteer) {
             console.log('Validation failed: Email already exists in database');

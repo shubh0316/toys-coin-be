@@ -5,6 +5,9 @@ const Volunteer = require("../models/Volunteer");
 const { geocodeAddress } = require("../utils/geocoding");
 const { sendMail } = require("../utils/mailer");
 
+// Simple helper to introduce an artificial delay before DB operations
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const MILES_TO_METERS = 1609.34;
 
 // ✅ 1. Invite Agency (Admin Only)
@@ -12,6 +15,8 @@ exports.inviteAgency = async (req, res) => {
     try {
         const { contact_email } = req.body;
 
+        // Artificial delay before querying the database
+        await delay(500);
         // Check if agency already exists
         const existingAgency = await Agency.findOne({ contact_email });
         if (existingAgency) {
@@ -306,12 +311,16 @@ exports.loginAgency = async (req, res) => {
     try {
         const { contact_email, choose_password } = req.body;
 
+        // Artificial delay before querying the database
+        await delay(500);
         // Check if email is already registered as a volunteer
         const existingVolunteer = await Volunteer.findOne({ contact_email });
         if (existingVolunteer) {
             return res.status(400).json({ message: "Email is already registered as a volunteer" });
         }
 
+        // Artificial delay before querying the database
+        await delay(500);
         // Find agency by email
         const agency = await Agency.findOne({ contact_email: new RegExp(`^${contact_email}$`, "i") });
         console.log("Agency Found:", agency);
