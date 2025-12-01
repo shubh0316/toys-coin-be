@@ -22,7 +22,17 @@ app.use(cors(corsOptions));
 app.use(helmet({
   referrerPolicy: { policy: "no-referrer-when-downgrade" },
   crossOriginEmbedderPolicy: false, // Allow cross-origin requests
+  contentSecurityPolicy: false, // Disable CSP to avoid mixed content issues
 }));
+
+// ✅ Add headers to handle mixed content
+app.use((req, res, next) => {
+  // Upgrade insecure requests (HTTP to HTTPS)
+  if (req.headers['x-forwarded-proto'] === 'http' && process.env.NODE_ENV === 'production') {
+    return res.redirect(301, `https://${req.headers.host}${req.url}`);
+  }
+  next();
+});
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -67,6 +77,6 @@ app.use((err, req, res, next) => {
 
 // ✅ Start Express Server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
