@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 const Agency = require("../models/Agency");
 const Volunteer = require("../models/Volunteer");
 const { geocodeAddress } = require("../utils/geocoding");
@@ -23,28 +24,24 @@ exports.inviteAgency = async (req, res) => {
             return res.status(400).json({ message: "Agency already invited" });
         }
 
-        // Create a new agency entry with pending status
-        const newAgency = new Agency({
-            contact_email,
-            status: "pending"
-        });
-
-        await newAgency.save();
-
-        // Send invitation email
+        // Generate a temporary ID for the invitation link (before creating the agency)
+        // We'll use this ID to create the agency after email is sent successfully
+        const tempAgencyId = new mongoose.Types.ObjectId();
+        
+        // Build invitation link with the temporary ID
         const invitationBaseUrl =
             process.env.AGENCY_INVITE_BASE_URL || "http://localhost:3000/v/agency";
-        const invitationLink = `${invitationBaseUrl}/${newAgency._id}/onboarding`;
+        const invitationLink = `${invitationBaseUrl}/${tempAgencyId}/onboarding`;
 
-        let emailSent = false;
-        let emailErrorMessage = null;
-        let emailPreviewUrl = null;
+        // Prepare email content
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const logoUrl = process.env.LOGO_URL || `${frontendUrl}/logo.png`;
 
+        // ✅ STEP 1: Send invitation email FIRST
+        // Only proceed to create agency if email is sent successfully
+        let mailResult;
         try {
-            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-            const logoUrl = process.env.LOGO_URL || `${frontendUrl}/logo.png`;
-            
-            const mailResult = await sendMail({
+            mailResult = await sendMail({
                 to: contact_email,
                 subject: "Agency Invitation - Foster Toys",
                 text: `Hello there,\n\nYou have been invited to join Foster Toys as an agency partner. Please fill out your agency details using the link below:\n\n${invitationLink}\n\nThank you,\nThe Foster Toys Team`,
@@ -135,34 +132,39 @@ exports.inviteAgency = async (req, res) => {
                 `,
             });
 
-            emailSent = true;
-            emailPreviewUrl = mailResult?.previewUrl || null;
+            console.log(`[inviteAgency] ✅ Email sent successfully to ${contact_email}`);
         } catch (sendError) {
-            console.error("Error sending invitation email:", sendError);
-            emailErrorMessage =
-                sendError?.message || "Unknown error sending email.";
-        }
-
-        if (emailErrorMessage) {
-            return res.status(200).json({
-                message: "Agency invited, but email could not be sent.",
-                agency: newAgency,
-                invitationLink,
-                emailSent,
-                emailErrorMessage,
-                emailPreviewUrl,
+            console.error("[inviteAgency] ❌ Error sending invitation email:", sendError);
+            // If email fails, do NOT create the agency
+            return res.status(500).json({ 
+                message: "Failed to send invitation email. Agency was not invited.",
+                error: sendError.message || "Unknown error sending email."
             });
         }
+
+        // ✅ STEP 2: Only create and save agency if email was sent successfully
+        const newAgency = new Agency({
+            _id: tempAgencyId, // Use the same ID we used in the invitation link
+            contact_email,
+            status: "pending"
+        });
+
+        await newAgency.save();
+        console.log(`[inviteAgency] ✅ Agency created with ID: ${newAgency._id}`);
 
         res.status(200).json({
             message: "Invitation sent successfully!",
             agency: newAgency,
             invitationLink,
             emailSent: true,
-            emailPreviewUrl,
+            messageId: mailResult?.messageId || null,
         });
     } catch (error) {
-        res.status(500).json({ message: "Error sending invitation", error });
+        console.error("[inviteAgency] ❌ Error in inviteAgency:", error);
+        res.status(500).json({ 
+            message: "Error sending invitation", 
+            error: error.message || error 
+        });
     }
 };
 exports.submitDetails = async (req, res) => {
