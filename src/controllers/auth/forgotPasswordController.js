@@ -134,18 +134,18 @@ exports.requestPasswordReset = async (req, res) => {
 
           <!-- FOOTER -->
           <tr>
-            <td align="center" style="padding: 40px 30px 20px 30px; color:#555; font-size:12px; line-height:18px;">
-              
+                       <td align="center" style="padding: 40px 30px 20px 30px; color:#555; font-size:12px; line-height:20px; text-align:center;">
+
               <strong>FOSTER TOYS, INC.</strong><br>
               1100 11TH STREET, SACRAMENTO CA. 95814<br><br>
+              FOSTER TOYS, INC. IS A 501(c)3 TAX-EXEMPT<br>
+              NONPROFIT ORGANIZATION<br>
+              TAX ID 39-3621457<br><br>
 
-              Foster Toys, Inc. is a 501(c)3 tax-exempt<br>
-              nonprofit charity organization<br>
-              Tax ID 39-3621457<br><br>
-
-              ©2025 Foster Toys, Inc. All rights reserved
+              ©2025 FOSTER TOYS, INC. ALL RIGHTS RESERVED
 
             </td>
+
           </tr>
 
         </table>
