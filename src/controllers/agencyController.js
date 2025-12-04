@@ -540,8 +540,8 @@ exports.filterAgenciesByRadius = async (req, res) => {
             const defaultFosterToysAgency = {
                 _id: "foster-toys-default",
                 organization_name: "Foster Toys",
-                shipping_address: "Sacramento, CA 95814",
-                geocoded_address: "Sacramento, CA 95814",
+                shipping_address: "Lakeport, CA 954553",
+                geocoded_address: "Lakeport, CA 954553",
                 contact_phone: "(916) 483-0330",
                 amazon_public: "https://www.amazon.com/hz/wishlist/ls/3NOW5IHJA7V6L?ref_=wl_share",
                 distanceInMiles: 0,
